@@ -145,41 +145,34 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            TweenAnimationBuilder<double>(
-              duration: const Duration(milliseconds: 600),
-              tween: Tween(begin: 0.0, end: 1.0),
-              builder: (context, value, child) {
-                return Transform.scale(
-                  scale: value,
+        TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 600),
+          tween: Tween(begin: 0.0, end: 1.0),
+          builder: (context, value, child) {
+            return Transform.scale(
+              scale: value,
 
-                  child: Image.asset(
-                    ImagePath.icon_img,
-                    height: 55,
-                    filterQuality: FilterQuality.high,
+              child: Container(
+                width: 150,
+                height: 70,
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color.fromARGB(255, 82, 63, 11),
+                      Color.fromARGB(255, 82, 11, 11),
+                      Color.fromARGB(255, 82, 11, 11),
+                    ],
                   ),
-
-                  // child: const Icon(Icons.restaurant_menu_outlined, color: Colors.white, size: 28),
-                );
-              },
-            ),
-            const SizedBox(width: 15),
-            ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFF8B4513), Color(0xFF654321)],
-              ).createShader(bounds),
-              child: const Text(
-                "Bulbul Hotel",
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: 1.5,
+                  borderRadius: BorderRadius.circular(12),
+                  image: DecorationImage(
+                    image: AssetImage(ImagePath.icon_img),
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
-            ),
-          ],
+            );
+          },
         ),
         Row(
           children: [
@@ -200,10 +193,19 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
       children: [
         Row(
           children: [
-            Image.asset(
-              ImagePath.icon_img,
-              height: 118,
-              filterQuality: FilterQuality.high,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Image.asset(
+                ImagePath.icon_img,
+                height: 55,
+                filterQuality: FilterQuality.high,
+              ),
             ),
             const SizedBox(width: 12),
             ShaderMask(
@@ -1175,47 +1177,52 @@ class ReviewsSection extends StatelessWidget {
   const ReviewsSection({super.key});
 
   final List<Map<String, String>> reviews = const [
-  {
-    "name": "Ahmed Khan",
-    "review": "Amazing food and cozy ambiance! The BBQ platter is outstanding.",
-    "image": "https://i.pravatar.cc/150?img=12",
-  },
-  {
-    "name": "Sara Ali",
-    "review": "Best biryani in town! Authentic taste that reminds me of home.",
-    "image": "https://i.pravatar.cc/150?img=47",
-  },
-  {
-    "name": "Bilal Sheikh",
-    "review": "Friendly staff and delicious food. Highly recommended!",
-    "image": "https://i.pravatar.cc/150?img=33",
-  },
-  {
-    "name": "Fatima Hassan",
-    "review": "The karahi chicken is to die for. Perfect spice level!",
-    "image": "https://i.pravatar.cc/150?img=45",
-  },
-  {
-    "name": "Usman Tariq",
-    "review": "Great coffee and amazing breakfast options. Love this place!",
-    "image": "https://i.pravatar.cc/150?img=52",
-  },
-  {
-    "name": "Ayesha Malik",
-    "review": "The nihari here is absolutely authentic! Takes me back to my grandmother's kitchen.",
-    "image": "https://i.pravatar.cc/150?img=38",
-  },
-  {
-    "name": "Hassan Raza",
-    "review": "Best seekh kababs in Sahiwal! The chapli kabab is also mind-blowing.",
-    "image": "https://i.pravatar.cc/150?img=14",
-  },
-  {
-    "name": "Zainab Siddiqui",
-    "review": "Their desi chai and haleem combo is perfection. Family-friendly atmosphere!",
-    "image": "https://i.pravatar.cc/150?img=44",
-  },
-];
+    {
+      "name": "Ahmed Khan",
+      "review":
+          "Amazing food and cozy ambiance! The BBQ platter is outstanding.",
+      "image": "https://i.pravatar.cc/150?img=12",
+    },
+    {
+      "name": "Sara Ali",
+      "review":
+          "Best biryani in town! Authentic taste that reminds me of home.",
+      "image": "https://i.pravatar.cc/150?img=47",
+    },
+    {
+      "name": "Bilal Sheikh",
+      "review": "Friendly staff and delicious food. Highly recommended!",
+      "image": "https://i.pravatar.cc/150?img=33",
+    },
+    {
+      "name": "Fatima Hassan",
+      "review": "The karahi chicken is to die for. Perfect spice level!",
+      "image": "https://i.pravatar.cc/150?img=45",
+    },
+    {
+      "name": "Usman Tariq",
+      "review": "Great coffee and amazing breakfast options. Love this place!",
+      "image": "https://i.pravatar.cc/150?img=52",
+    },
+    {
+      "name": "Ayesha Malik",
+      "review":
+          "The nihari here is absolutely authentic! Takes me back to my grandmother's kitchen.",
+      "image": "https://i.pravatar.cc/150?img=38",
+    },
+    {
+      "name": "Hassan Raza",
+      "review":
+          "Best seekh kababs in Sahiwal! The chapli kabab is also mind-blowing.",
+      "image": "https://i.pravatar.cc/150?img=14",
+    },
+    {
+      "name": "Zainab Siddiqui",
+      "review":
+          "Their desi chai and haleem combo is perfection. Family-friendly atmosphere!",
+      "image": "https://i.pravatar.cc/150?img=44",
+    },
+  ];
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 850;
@@ -1665,22 +1672,6 @@ class _FooterBrand extends StatelessWidget {
       children: [
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Image.asset(
-                    ImagePath.icon_img,
-                    height: 55,
-                    filterQuality: FilterQuality.high,
-                  ),
-
-            ),
-            const SizedBox(width: 15),
             const Text(
               'Bulbul Cafe',
               style: TextStyle(
