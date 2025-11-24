@@ -1,6 +1,10 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:bulbul_project/image_path.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'dart:html' hide VoidCallback;
+import 'dart:ui_web' as ui;
 
 void main() {
   runApp(const MyApp());
@@ -14,13 +18,19 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primaryColor: const Color(0xFFE8B86D),
-        scaffoldBackgroundColor: const Color(0xFFFFFBF5),
+        primaryColor: const Color(0xFF2D1B00),
+        scaffoldBackgroundColor: const Color(0xFFFFF8E7),
         fontFamily: 'SF Pro Display',
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFE8B86D),
-          primary: const Color(0xFFE8B86D),
-          secondary: const Color(0xFF8B4513),
+          seedColor: const Color(0xFFFF6B35),
+          primary: const Color(0xFFFF6B35),
+          secondary: const Color(0xFFF7931E),
+        ),
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          },
         ),
       ),
       home: const HomePage(),
@@ -35,326 +45,286 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
-  final Map<String, GlobalKey> _sectionKeys = {
-    'Home': GlobalKey(),
-    'About': GlobalKey(),
-    'Menu': GlobalKey(),
-    'Reviews': GlobalKey(),
-    'Contact': GlobalKey(),
-  };
-
-  void _scrollToSection(String section) {
-    final key = _sectionKeys[section];
-    if (key?.currentContext != null) {
-      Scrollable.ensureVisible(
-        key!.currentContext!,
-        duration: const Duration(milliseconds: 1200),
-        curve: Curves.easeInOutCubic,
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SingleChildScrollView(
-        controller: _scrollController,
-        child: Column(
-          children: [
-            AnimatedNavBar(onNavigate: _scrollToSection),
-            HeroSection(key: _sectionKeys['Home']),
-            AboutSection(key: _sectionKeys['About']),
-            MenuSection(key: _sectionKeys['Menu']),
-            ContactSection(key: _sectionKeys['Contact']),
-            ReviewsSection(key: _sectionKeys['Reviews']),
-            const FooterSection(),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _scrollToSection('Home'),
-        backgroundColor: const Color(0xFFE8B86D),
-        child: const Icon(Icons.arrow_upward, color: Colors.white),
-      ),
-    );
-  }
-}
-
-// ---------------------- ANIMATED NAVBAR ----------------------
-class AnimatedNavBar extends StatefulWidget {
-  final Function(String section) onNavigate;
-  const AnimatedNavBar({super.key, required this.onNavigate});
-
-  @override
-  State<AnimatedNavBar> createState() => _AnimatedNavBarState();
-}
-
-class _AnimatedNavBarState extends State<AnimatedNavBar>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  String _hoveredItem = '';
+  final List<GlobalKey> _sectionKeys = List.generate(5, (_) => GlobalKey());
+  
+  late AnimationController _floatingController;
+  int _currentSection = 0;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 300),
+    _floatingController = AnimationController(
+      duration: const Duration(seconds: 3),
       vsync: this,
-    )..forward();
+    )..repeat(reverse: true);
+    
+    // Listen to scroll to update current section
+    _scrollController.addListener(_updateCurrentSection);
+  }
+
+  void _updateCurrentSection() {
+    for (int i = 0; i < _sectionKeys.length; i++) {
+      final context = _sectionKeys[i].currentContext;
+      if (context != null) {
+        final renderBox = context.findRenderObject() as RenderBox?;
+        if (renderBox != null) {
+          final position = renderBox.localToGlobal(Offset.zero);
+          if (position.dy <= 200 && position.dy >= -500) {
+            if (_currentSection != i) {
+              setState(() => _currentSection = i);
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  void _scrollToSection(int sectionIndex) {
+    final context = _sectionKeys[sectionIndex].currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 1000),
+        curve: Curves.easeInOutCubic,
+        alignment: 0.0,
+      );
+    }
+  }
+
+  void _navigateToSection(String label) {
+    final sections = ['HOME', 'STORY', 'MENU', 'REVIEWS', 'CONNECT'];
+    final index = sections.indexOf(label);
+    if (index != -1) {
+      _scrollToSection(index);
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _scrollController.dispose();
+    _floatingController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final isMobile = width < 850;
+    return Scaffold(
+      body: Stack(
+        children: [
+          // Animated background shapes
+          ...List.generate(5, (index) => _buildFloatingShape(index)),
 
-    return SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(0, -1),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut)),
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          vertical: 20,
-          horizontal: isMobile ? 20 : 60,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
+          SingleChildScrollView(
+            controller: _scrollController,
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              children: [
+                UniqueNavBar(
+                  onItemTap: _navigateToSection,
+                  currentSection: _currentSection,
+                ),
+                Container(key: _sectionKeys[0], child: const HeroSectionUnique()),
+                Container(key: _sectionKeys[1], child: const AboutSectionUnique()),
+                Container(key: _sectionKeys[2], child: const MenuSectionUnique()),
+                Container(key: _sectionKeys[3], child: const ReviewsSectionUnique()),
+                Container(key: _sectionKeys[4], child: ContactSectionUnique()),
+                const FooterSectionUnique(),
+              ],
             ),
-          ],
-        ),
-        child: isMobile ? _buildMobileNav(context) : _buildDesktopNav(context),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildDesktopNav(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        TweenAnimationBuilder<double>(
-          duration: const Duration(milliseconds: 600),
-          tween: Tween(begin: 0.0, end: 1.0),
-          builder: (context, value, child) {
-            return Transform.scale(
-              scale: value,
+  Widget _buildFloatingShape(int index) {
+    return AnimatedBuilder(
+      animation: _floatingController,
+      builder: (context, child) {
+        final offset = math.sin(_floatingController.value * 2 * math.pi + index) * 30;
+        return Positioned(
+          left: (index * 200.0) % MediaQuery.of(context).size.width,
+          top: 100 + offset,
+          child: Transform.rotate(
+            angle: _floatingController.value * 2 * math.pi,
+            child: Container(
+              width: 80 + (index * 20),
+              height: 80 + (index * 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFFF6B35).withOpacity(0.1),
+                    const Color(0xFFF7931E).withOpacity(0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20 + index * 5),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
 
+// ==================== IMPROVED NAVBAR ====================
+class UniqueNavBar extends StatefulWidget {
+  final void Function(String label) onItemTap;
+  final int currentSection;
+
+  const UniqueNavBar({
+    super.key,
+    required this.onItemTap,
+    required this.currentSection,
+  });
+
+  @override
+  State<UniqueNavBar> createState() => _UniqueNavBarState();
+}
+
+class _UniqueNavBarState extends State<UniqueNavBar> {
+  String _hoveredItem = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 900;
+
+    return Container(
+      margin: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2D1B00).withOpacity(0.95),
+        borderRadius: BorderRadius.circular(50),
+        border: Border.all(
+          color: const Color(0xFFFF6B35).withOpacity(0.3),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF6B35).withOpacity(0.2),
+            blurRadius: 30,
+            spreadRadius: -5,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => widget.onItemTap('HOME'),
               child: Container(
-                width: 150,
-                height: 70,
-                padding: const EdgeInsets.symmetric(horizontal: 5),
+                height: 50,
+                width: 120,
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [
-                      Color.fromARGB(255, 82, 63, 11),
-                      Color.fromARGB(255, 82, 11, 11),
-                      Color.fromARGB(255, 82, 11, 11),
-                    ],
+                    colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                  image: DecorationImage(
-                    image: AssetImage(ImagePath.icon_img),
-                    fit: BoxFit.cover,
-                  ),
+                  borderRadius: BorderRadius.circular(25),
+                  image: DecorationImage(image: AssetImage(ImagePath.logo_img),fit: BoxFit.cover)
                 ),
+                
               ),
-            );
-          },
-        ),
-        Row(
-          children: [
-            'Home',
-            'About',
-            'Menu',
-            'Reviews',
-            'Contact',
-          ].map((item) => _navButton(item)).toList(),
-        ),
-      ],
+            ),
+          ),
+
+          if (!isMobile)
+            Row(
+              children: [
+                _buildNavItem('HOME', 0),
+                _buildNavItem('STORY', 1),
+                _buildNavItem('MENU', 2),
+                _buildNavItem('REVIEWS', 3),
+                _buildNavItem('CONNECT', 4),
+              ],
+            ),
+
+          if (isMobile)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.menu_rounded, color: Colors.white),
+              onSelected: widget.onItemTap,
+              itemBuilder: (BuildContext context) => [
+                'HOME',
+                'STORY',
+                'MENU',
+                'REVIEWS',
+                'CONNECT',
+              ].map((String item) {
+                return PopupMenuItem<String>(
+                  value: item,
+                  child: Text(item),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _buildMobileNav(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Image.asset(
-                ImagePath.icon_img,
-                height: 55,
-                filterQuality: FilterQuality.high,
-              ),
-            ),
-            const SizedBox(width: 12),
-            ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFF8B4513), Color(0xFF654321)],
-              ).createShader(bounds),
-              child: const Text(
-                "Bulbul",
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
-        IconButton(
-          icon: const Icon(Icons.menu_rounded, size: 30),
-          onPressed: () => _showMobileMenu(context),
-        ),
-      ],
-    );
-  }
-
-  Widget _navButton(String label) {
+  Widget _buildNavItem(String label, int sectionIndex) {
     final isHovered = _hoveredItem == label;
+    final isActive = widget.currentSection == sectionIndex;
 
     return MouseRegion(
+      cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hoveredItem = label),
       onExit: (_) => setState(() => _hoveredItem = ''),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.symmetric(horizontal: 8),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
         child: TextButton(
-          onPressed: () => widget.onNavigate(label),
+          onPressed: () => widget.onItemTap(label),
           style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            backgroundColor: isHovered
-                ? const Color(0xFFE8B86D).withOpacity(0.1)
-                : Colors.transparent,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            backgroundColor: isActive
+                ? const Color(0xFFFF6B35)
+                : isHovered
+                    ? const Color(0xFFFF6B35).withOpacity(0.7)
+                    : Colors.transparent,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(20),
             ),
           ),
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 16,
-              fontWeight: isHovered ? FontWeight.w700 : FontWeight.w600,
-              color: isHovered
-                  ? const Color(0xFFE8B86D)
-                  : const Color(0xFF2C1810),
-              letterSpacing: 0.5,
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: isHovered || isActive ? 2 : 1.5,
             ),
           ),
         ),
       ),
     );
   }
-
-  void _showMobileMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 30),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: ['Home', 'About', 'Menu', 'Reviews', 'Contact']
-              .map(
-                (item) => ListTile(
-                  leading: Icon(
-                    _getIconForSection(item),
-                    color: const Color(0xFFE8B86D),
-                  ),
-                  title: Text(
-                    item,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    widget.onNavigate(item);
-                  },
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    );
-  }
-
-  IconData _getIconForSection(String section) {
-    switch (section) {
-      case 'Home':
-        return Icons.home_rounded;
-      case 'About':
-        return Icons.info_rounded;
-      case 'Menu':
-        return Icons.restaurant_menu_rounded;
-      case 'Reviews':
-        return Icons.star_rounded;
-      case 'Contact':
-        return Icons.contact_mail_rounded;
-      default:
-        return Icons.circle;
-    }
-  }
 }
 
-// ---------------------- HERO SECTION ----------------------
-class HeroSection extends StatefulWidget {
-  const HeroSection({super.key});
+// ==================== UNIQUE HERO SECTION ====================
+class HeroSectionUnique extends StatefulWidget {
+  const HeroSectionUnique({super.key});
 
   @override
-  State<HeroSection> createState() => _HeroSectionState();
+  State<HeroSectionUnique> createState() => _HeroSectionUniqueState();
 }
 
-class _HeroSectionState extends State<HeroSection>
+class _HeroSectionUniqueState extends State<HeroSectionUnique>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(seconds: 4),
       vsync: this,
-    );
-
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-
-    _controller.forward();
+    )..repeat();
   }
 
   @override
@@ -367,419 +337,544 @@ class _HeroSectionState extends State<HeroSection>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
-    return Container(
-      height: size.height * 0.95,
+    return SizedBox(
+      height: size.height,
       width: double.infinity,
-      decoration: const BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage(ImagePath.bg_img),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.black.withOpacity(0.6),
-              Colors.black.withOpacity(0.3),
-              Colors.black.withOpacity(0.7),
-            ],
+      child: Stack(
+        children: [
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color.lerp(
+                        const Color(0xFF2D1B00),
+                        const Color(0xFF4A2C00),
+                        math.sin(_controller.value * 2 * math.pi) * 0.5 + 0.5,
+                      )!,
+                      const Color(0xFF2D1B00),
+                      Color.lerp(
+                        const Color(0xFF1A0F00),
+                        const Color(0xFF2D1B00),
+                        math.cos(_controller.value * 2 * math.pi) * 0.5 + 0.5,
+                      )!,
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
-        ),
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Animated badge
-                    TweenAnimationBuilder<double>(
-                      duration: const Duration(milliseconds: 1000),
-                      tween: Tween(begin: 0.0, end: 1.0),
-                      builder: (context, value, child) {
-                        return Transform.scale(
-                          scale: value,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFE8B86D), Color(0xFFD4A860)],
-                              ),
-                              borderRadius: BorderRadius.circular(30),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFFE8B86D,
-                                  ).withOpacity(0.3),
-                                  blurRadius: 20,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                            child: const Text(
-                              '✨ Serving Since 1985',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 1,
-                              ),
+          Positioned(
+            right: -100,
+            top: size.height * 0.2,
+            child: Opacity(
+              opacity: 0.03,
+              child: Transform.rotate(
+                angle: -0.1,
+                child: const Text(
+                  'FOOD',
+                  style: TextStyle(
+                    fontSize: 300,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 60),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: const Color(0xFFFF6B35),
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'EST. 1985',
+                      style: TextStyle(
+                        color: Color(0xFFFF6B35),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  Row(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'TASTE',
+                            style: TextStyle(
+                              fontSize: 90,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              height: 0.9,
+                              letterSpacing: -2,
                             ),
                           ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 30),
-
-                    // Main title
-                    const Text(
-                      'Welcome to',
-                      style: TextStyle(
-                        fontSize: 28,
-                        color: Colors.white,
-                        letterSpacing: 2,
-                        fontWeight: FontWeight.w300,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    ShaderMask(
-                      shaderCallback: (bounds) => const LinearGradient(
-                        colors: [Colors.white, Color(0xFFE8B86D)],
-                      ).createShader(bounds),
-                      child: const Text(
-                        'Bulbul Hotel',
-                        style: TextStyle(
-                          fontSize: 72,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          letterSpacing: 2,
-                          height: 1.2,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Authentic Pakistani Flavors & Gourmet Delights',
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: Colors.white,
-                        letterSpacing: 1.2,
-                        fontWeight: FontWeight.w400,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 50),
-
-                    // Animated button
-                    TweenAnimationBuilder<double>(
-                      duration: const Duration(milliseconds: 1500),
-                      tween: Tween(begin: 0.0, end: 1.0),
-                      builder: (context, value, child) {
-                        return Transform.scale(
-                          scale: value,
-                          child: MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            child: AnimatedButton(
-                              onPressed: () {},
-                              child: Container(
+                          Row(
+                            children: [
+                              const Text(
+                                'THE',
+                                style: TextStyle(
+                                  fontSize: 90,
+                                  fontWeight: FontWeight.w300,
+                                  color: Colors.white,
+                                  height: 0.9,
+                                  letterSpacing: 2,
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 50,
-                                  vertical: 20,
+                                  horizontal: 30,
+                                  vertical: 10,
                                 ),
                                 decoration: BoxDecoration(
                                   gradient: const LinearGradient(
                                     colors: [
-                                      Color(0xFFE8B86D),
-                                      Color(0xFFD4A860),
+                                      Color(0xFFFF6B35),
+                                      Color(0xFFF7931E),
                                     ],
                                   ),
-                                  borderRadius: BorderRadius.circular(35),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(
-                                        0xFFE8B86D,
-                                      ).withOpacity(0.4),
-                                      blurRadius: 25,
-                                      spreadRadius: 3,
-                                    ),
-                                  ],
+                                  borderRadius: BorderRadius.circular(15),
                                 ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      'Explore Our Menu',
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                        letterSpacing: 1,
-                                      ),
-                                    ),
-                                    SizedBox(width: 10),
-                                    Icon(
-                                      Icons.arrow_forward_rounded,
-                                      color: Colors.white,
-                                    ),
-                                  ],
+                                child: const Text(
+                                  'REAL',
+                                  style: TextStyle(
+                                    fontSize: 80,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    height: 1,
+                                  ),
                                 ),
                               ),
+                            ],
+                          ),
+                          const Text(
+                            'PAKISTAN',
+                            style: TextStyle(
+                              fontSize: 90,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              height: 0.9,
+                              letterSpacing: 8,
                             ),
                           ),
-                        );
-                      },
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  const Text(
+                    'Where every bite tells a story of tradition, \npassion, and authentic Pakistani flavors.',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.white70,
+                      height: 1.6,
+                      letterSpacing: 0.5,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 50),
+                  Row(
+                    children: [
+                      _UniqueCTAButton(
+                        text: 'EXPLORE MENU',
+                        isPrimary: true,
+                        onPressed: () {},
+                      ),
+                      const SizedBox(width: 20),
+                      _UniqueCTAButton(
+                        text: 'RESERVE TABLE',
+                        isPrimary: false,
+                        onPressed: () {},
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------- ANIMATED BUTTON WIDGET ----------------------
-class AnimatedButton extends StatefulWidget {
-  final Widget child;
-  final VoidCallback onPressed;
-
-  const AnimatedButton({
-    super.key,
-    required this.child,
-    required this.onPressed,
-  });
-
-  @override
-  State<AnimatedButton> createState() => _AnimatedButtonState();
-}
-
-class _AnimatedButtonState extends State<AnimatedButton> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) {
-        setState(() => _isPressed = false);
-        widget.onPressed();
-      },
-      onTapCancel: () => setState(() => _isPressed = false),
-      child: AnimatedScale(
-        scale: _isPressed ? 0.95 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: widget.child,
-      ),
-    );
-  }
-}
-
-// ---------------------- ABOUT SECTION ----------------------
-class AboutSection extends StatelessWidget {
-  const AboutSection({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 850;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 20 : 100,
-        vertical: isMobile ? 60 : 120,
-      ),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            const Color(0xFFFFFBF5),
-            const Color(0xFFE8B86D).withOpacity(0.05),
-          ],
-        ),
-      ),
-      child: Column(
-        children: [
-          _SectionHeader(title: 'Our Story'),
-          const SizedBox(height: 60),
-          isMobile
-              ? Column(
-                  children: [
-                    _AboutImage(),
-                    const SizedBox(height: 40),
-                    _AboutContent(),
-                  ],
-                )
-              : Row(
-                  children: [
-                    Expanded(child: _AboutImage()),
-                    const SizedBox(width: 80),
-                    Expanded(child: _AboutContent()),
-                  ],
-                ),
+          Positioned(right: 50, bottom: 50, child: _buildFloatingFoodElement()),
         ],
       ),
     );
   }
-}
 
-class _AboutImage extends StatefulWidget {
-  @override
-  State<_AboutImage> createState() => _AboutImageState();
-}
-
-class _AboutImageState extends State<_AboutImage>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(seconds: 3),
-      vsync: this,
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildFloatingFoodElement() {
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
         return Transform.translate(
-          offset: Offset(0, math.sin(_controller.value * 2 * math.pi) * 10),
-          child: child,
+          offset: Offset(
+            math.cos(_controller.value * 2 * math.pi) * 20,
+            math.sin(_controller.value * 2 * math.pi) * 20,
+          ),
+          child: Container(
+            width: 400,
+            height: 400,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  const Color(0xFFFF6B35).withOpacity(0.3),
+                  const Color(0xFFFF6B35).withOpacity(0.0),
+                ],
+              ),
+            ),
+            child: Center(
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFF7931E).withOpacity(0.1),
+                  border: Border.all(
+                    color: const Color(0xFFFF6B35).withOpacity(0.3),
+                    width: 3,
+                  ),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.restaurant_rounded,
+                    size: 100,
+                    color: Color(0xFFFF6B35),
+                  ),
+                ),
+              ),
+            ),
+          ),
         );
       },
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFE8B86D).withOpacity(0.3),
-              blurRadius: 20,
-              spreadRadius: 5,
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(30),
-          child: Image.asset(
-            ImagePath.about_img,
-            height: 500,
-            fit: BoxFit.cover,
+    );
+  }
+}
+
+class _UniqueCTAButton extends StatefulWidget {
+  final String text;
+  final bool isPrimary;
+  final VoidCallback onPressed;
+
+  const _UniqueCTAButton({
+    required this.text,
+    required this.isPrimary,
+    required this.onPressed,
+  });
+
+  @override
+  State<_UniqueCTAButton> createState() => _UniqueCTAButtonState();
+}
+
+class _UniqueCTAButtonState extends State<_UniqueCTAButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+          decoration: BoxDecoration(
+            gradient: widget.isPrimary
+                ? const LinearGradient(
+                    colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
+                  )
+                : null,
+            color: !widget.isPrimary ? Colors.transparent : null,
+            border: !widget.isPrimary
+                ? Border.all(color: Colors.white, width: 2)
+                : null,
+            borderRadius: BorderRadius.circular(0),
+            boxShadow: _isHovered && widget.isPrimary
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFFFF6B35).withOpacity(0.5),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                widget.text,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Icon(
+                _isHovered
+                    ? Icons.arrow_forward_rounded
+                    : Icons.arrow_right_alt_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
+// ==================== UNIQUE ABOUT SECTION ====================
+class AboutSectionUnique extends StatelessWidget {
+  const AboutSectionUnique({super.key});
 
-class _AboutContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                const Color(0xFFE8B86D).withOpacity(0.2),
-                const Color(0xFFE8B86D).withOpacity(0.1),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 120),
+      color: const Color(0xFFFFF8E7),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFF6B35),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                const Text(
+                  'OUR',
+                  style: TextStyle(
+                    fontSize: 60,
+                    fontWeight: FontWeight.w300,
+                    color: Color(0xFF2D1B00),
+                    height: 1,
+                  ),
+                ),
+                Stack(
+                  children: [
+                    Text(
+                      'STORY',
+                      style: TextStyle(
+                        fontSize: 60,
+                        fontWeight: FontWeight.w900,
+                        foreground: Paint()
+                          ..style = PaintingStyle.stroke
+                          ..strokeWidth = 2
+                          ..color = const Color(0xFFFF6B35),
+                        height: 1,
+                      ),
+                    ),
+                    const Text(
+                      'STORY',
+                      style: TextStyle(
+                        fontSize: 60,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.transparent,
+                        height: 1,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 30),
+                Container(
+                  height: 4,
+                  width: 80,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 30),
+                const Text(
+                  'Since 1985, we\'ve been crafting authentic Pakistani cuisine that brings people together. Our secret? Fresh ingredients, traditional recipes, and a whole lot of heart.',
+                  style: TextStyle(
+                    fontSize: 18,
+                    height: 1.8,
+                    color: Color(0xFF6B5B4E),
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Every dish we serve is a celebration of our rich culinary heritage, prepared with the same passion and dedication that started it all.',
+                  style: TextStyle(
+                    fontSize: 16,
+                    height: 1.8,
+                    color: Color(0xFF9B8B7E),
+                  ),
+                ),
+                const SizedBox(height: 40),
+                Row(
+                  children: const [
+                    _UniqueStatCard(
+                      number: '38+',
+                      label: 'YEARS',
+                      color: Color(0xFFFF6B35),
+                    ),
+                    SizedBox(width: 20),
+                    _UniqueStatCard(
+                      number: '50K+',
+                      label: 'SERVED',
+                      color: Color(0xFFF7931E),
+                    ),
+                    SizedBox(width: 20),
+                    _UniqueStatCard(
+                      number: '100+',
+                      label: 'DISHES',
+                      color: Color(0xFFFF6B35),
+                    ),
+                  ],
+                ),
               ],
             ),
-            borderRadius: BorderRadius.circular(30),
           ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
+          const SizedBox(width: 100),
+          Expanded(child: _buildAboutImageGrid()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAboutImageGrid() {
+    return Stack(
+      children: [
+        // Background decorative element
+        Positioned(
+          top: -20,
+          right: -20,
+          child: Container(
+            width: 200,
+            height: 200,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
+              ),
+              borderRadius: BorderRadius.circular(30),
+            ),
+          ),
+        ),
+
+        // Main image container
+        Container(
+          margin: const EdgeInsets.only(top: 40, left: 40),
+          child: Column(
             children: [
-              Icon(Icons.auto_awesome, color: Color(0xFFE8B86D), size: 20),
-              SizedBox(width: 8),
-              Text(
-                'Tradition • Quality • Excellence',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF8B4513),
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1,
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 250,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2D1B00),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFFFF6B35),
+                          width: 3,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.restaurant_rounded,
+                          size: 80,
+                          color: Color(0xFFFF6B35),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Container(
+                      height: 250,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.local_fire_department_rounded,
+                          size: 80,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                height: 150,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7931E).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFF7931E), width: 2),
+                ),
+                child: const Center(
+                  child: Text(
+                    '✨ AUTHENTIC FLAVORS',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF2D1B00),
+                      letterSpacing: 2,
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 25),
-        const Text(
-          'A Legacy of Authentic Flavors',
-          style: TextStyle(
-            fontSize: 36,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF2C1810),
-            height: 1.3,
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'Since 1985, Bulbul Cafe has been the heart of Sahiwal\'s culinary scene. '
-          'We take pride in serving traditional Pakistani dishes prepared with authentic recipes '
-          'passed down through generations.',
-          style: TextStyle(
-            fontSize: 18,
-            height: 1.8,
-            color: Colors.grey[700],
-            letterSpacing: 0.3,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Every dish tells a story of heritage, passion, and dedication to excellence. '
-          'From our signature handis to aromatic biryanis, we bring you flavors that feel like home.',
-          style: TextStyle(
-            fontSize: 18,
-            height: 1.8,
-            color: Colors.grey[700],
-            letterSpacing: 0.3,
-          ),
-        ),
-        const SizedBox(height: 40),
-        Row(
-          children: [
-            _StatCard(number: '38+', label: 'Years'),
-            const SizedBox(width: 20),
-            _StatCard(number: '50K+', label: 'Happy Customers'),
-            const SizedBox(width: 20),
-            _StatCard(number: '100+', label: 'Dishes'),
-          ],
         ),
       ],
     );
   }
 }
 
-class _StatCard extends StatelessWidget {
+class _UniqueStatCard extends StatelessWidget {
   final String number;
   final String label;
+  final Color color;
 
-  const _StatCard({required this.number, required this.label});
+  const _UniqueStatCard({
+    required this.number,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -787,35 +882,27 @@ class _StatCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFE8B86D), Color(0xFFD4A860)],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFE8B86D).withOpacity(0.3),
-              blurRadius: 15,
-              spreadRadius: 2,
-            ),
-          ],
+          border: Border.all(color: color, width: 3),
+          borderRadius: BorderRadius.circular(0),
         ),
         child: Column(
           children: [
             Text(
               number,
-              style: const TextStyle(
-                fontSize: 28,
+              style: TextStyle(
+                fontSize: 32,
                 fontWeight: FontWeight.w900,
-                color: Colors.white,
+                color: color,
               ),
             ),
             const SizedBox(height: 5),
             Text(
               label,
               style: const TextStyle(
-                fontSize: 14,
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF2D1B00),
+                letterSpacing: 2,
               ),
             ),
           ],
@@ -825,160 +912,127 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ---------------------- SECTION HEADER ----------------------
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-
-  const _SectionHeader({required this.title, this.subtitle});
+// ==================== UNIQUE MENU SECTION ====================
+class MenuSectionUnique extends StatelessWidget {
+  const MenuSectionUnique({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF2C1810),
-            letterSpacing: 1,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 15),
-        Container(
-          height: 5,
-          width: 100,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFE8B86D), Color(0xFFD4A860)],
-            ),
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 15),
-          Text(
-            subtitle!,
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey[600],
-              letterSpacing: 0.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-// ---------------------- MENU SECTION ----------------------
-class MenuSection extends StatelessWidget {
-  const MenuSection({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 850;
-
     return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 20 : 100,
-        vertical: isMobile ? 60 : 120,
-      ),
-      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 120),
+      color: const Color(0xFF2D1B00),
       child: Column(
         children: [
-          const _SectionHeader(
-            title: 'Signature Dishes',
-            subtitle: 'Crafted with passion, served with love',
-          ),
-          const SizedBox(height: 60),
-          Wrap(
-            spacing: 30,
-            runSpacing: 30,
-            alignment: WrapAlignment.center,
+          // Section header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _MenuCard(
-                image:
-                    'https://images.unsplash.com/photo-1603360946369-dc9bb6258143?w=600&q=80',
-                title: 'Chicken Karahi',
-                description:
-                    'Tender chicken in aromatic tomato gravy with traditional spices',
-                price: 'Rs. 850',
-                delay: 0,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'SIGNATURE',
+                    style: TextStyle(
+                      fontSize: 60,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      height: 1,
+                    ),
+                  ),
+                  Stack(
+                    children: [
+                      Text(
+                        'DISHES',
+                        style: TextStyle(
+                          fontSize: 60,
+                          fontWeight: FontWeight.w900,
+                          foreground: Paint()
+                            ..style = PaintingStyle.stroke
+                            ..strokeWidth = 2
+                            ..color = const Color(0xFFFF6B35),
+                          height: 1,
+                        ),
+                      ),
+                      const Text(
+                        'DISHES',
+                        style: TextStyle(
+                          fontSize: 60,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.transparent,
+                          height: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              _MenuCard(
-                image:
-                    'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&q=80',
-                title: 'Mutton Biryani',
-                description:
-                    'Fragrant basmati rice layered with succulent mutton pieces',
-                price: 'Rs. 950',
-                delay: 200,
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 15,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0xFFFF6B35), width: 2),
+                ),
+                child: const Text(
+                  'VIEW ALL →',
+                  style: TextStyle(
+                    color: Color(0xFFFF6B35),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                  ),
+                ),
               ),
-              _MenuCard(
-                image:
-                    'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=600&q=80',
-                title: 'Seekh Kabab',
-                description: 'Juicy minced meat kababs grilled to perfection',
-                price: 'Rs. 650',
-                delay: 400,
-              ),
-              _MenuCard(
-                image:
-                    'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=600&q=80',
-                title: 'Nihari',
-                description:
-                    'Slow-cooked beef stew with bone marrow and aromatic spices',
-                price: 'Rs. 750',
-                delay: 600,
-              ),
-              _MenuCard(
-                image:
-                    'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=600&q=80',
-                title: 'Dal Makhani',
-                description:
-                    'Creamy black lentils slow-cooked with butter and cream',
-                price: 'Rs. 450',
-                delay: 800,
-              ),
-              _MenuCard(
-                image:
-                    'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=600&q=80',
-                title: 'Chicken Tikka',
-                description:
-                    'Marinated chicken chunks grilled in tandoor with spices',
-                price: 'Rs. 700',
-                delay: 1000,
-              ),
-              _MenuCard(
-                image:
-                    'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=600&q=80',
-                title: 'Haleem',
-                description: 'Traditional wheat and meat stew cooked overnight',
-                price: 'Rs. 550',
-                delay: 1200,
-              ),
+            ],
+          ),
 
-              _MenuCard(
-                image:
-                    'https://images.unsplash.com/photo-1588166524941-3bf61a9c41db?w=600&q=80',
-                title: 'Butter Chicken',
-                description: 'Creamy tomato curry with tender chicken pieces',
-                price: 'Rs. 800',
-                delay: 1600,
+          const SizedBox(height: 80),
+
+          // Menu grid
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 3,
+            mainAxisSpacing: 30,
+            crossAxisSpacing: 30,
+            childAspectRatio: 0.85,
+            children: const [
+              _UniqueMenuCard(
+                title: 'CHICKEN\nKARAHI',
+                price: '850',
+                index: 0,
+                img: ImagePath.chicken_krai,
               ),
-              _MenuCard(
-                image:
-                    'https://images.unsplash.com/photo-1574894709920-11b28e7367e3?w=600&q=80',
-                title: 'Chicken Handi',
-                description:
-                    'Boneless chicken cooked in yogurt and cream sauce',
-                price: 'Rs. 900',
-                delay: 1800,
+              _UniqueMenuCard(
+                title: 'MUTTON\nBIRYANI',
+                price: '950',
+                index: 1,
+                img: ImagePath.mutton_krai,
+              ),
+              _UniqueMenuCard(
+                title: 'SEEKH\nKABAB',
+                price: '650',
+                index: 2,
+                img: ImagePath.seek_kbab,
+              ),
+              _UniqueMenuCard(
+                title: 'BEEF\nNIHARI',
+                price: '750',
+                index: 3,
+                img: ImagePath.beef_nihari,
+              ),
+              _UniqueMenuCard(
+                title: 'DAL\nMAKHANI',
+                price: '450',
+                index: 4,
+                img: ImagePath.daal_makhni,
+              ),
+              _UniqueMenuCard(
+                title: 'CHICKEN\nTIKKA',
+                price: '700',
+                index: 5,
+                img: ImagePath.chikken_tikka,
               ),
             ],
           ),
@@ -988,284 +1042,191 @@ class MenuSection extends StatelessWidget {
   }
 }
 
-class _MenuCard extends StatefulWidget {
-  final String image;
+class _UniqueMenuCard extends StatefulWidget {
   final String title;
-  final String description;
   final String price;
-  final int delay;
+  final int index;
+  final String img;
 
-  const _MenuCard({
-    required this.image,
+  const _UniqueMenuCard({
     required this.title,
-    required this.description,
     required this.price,
-    required this.delay,
+    required this.index,
+    required this.img,
   });
 
   @override
-  State<_MenuCard> createState() => _MenuCardState();
+  State<_UniqueMenuCard> createState() => _UniqueMenuCardState();
 }
 
-class _MenuCardState extends State<_MenuCard>
-    with SingleTickerProviderStateMixin {
+class _UniqueMenuCardState extends State<_UniqueMenuCard> {
   bool _isHovered = false;
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _scaleAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-
-    Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) _controller.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scaleAnimation,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() => _isHovered = false),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          transform: Matrix4.identity()
-            ..translate(0.0, _isHovered ? -10.0 : 0.0),
-          child: Container(
-            width: 320,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: _isHovered
-                      ? const Color(0xFFE8B86D).withOpacity(0.4)
-                      : Colors.black.withOpacity(0.1),
-                  blurRadius: _isHovered ? 30 : 15,
-                  spreadRadius: _isHovered ? 5 : 2,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        transform: Matrix4.identity()..translate(0.0, _isHovered ? -10.0 : 0.0),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: _isHovered ? const Color(0xFFFF6B35) : Colors.white24,
+            width: 2,
+          ),
+          color: _isHovered ? const Color(0xFF3D2B10) : Colors.transparent,
+        ),
+        child: Stack(
+          children: [
+            // Number
+            Positioned(
+              top: 20,
+              right: 20,
+              child: Text(
+                '0${widget.index + 1}',
+                style: TextStyle(
+                  fontSize: 80,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white.withOpacity(0.05),
                 ),
-              ],
-            ),
-            child: Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
               ),
+            ),
+            Container(
+              height: MediaQuery.heightOf(context) * 0.5,
+              width: MediaQuery.widthOf(context),
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(widget.img),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(30),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Stack(
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.restaurant_rounded,
+                      color: Colors.white,
+                      size: 30,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    widget.title,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      height: 1.1,
+                      letterSpacing: -1,
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(25),
-                        ),
-                        child: Image.network(
-                          widget.image,
-                          height: 220,
-                          fit: BoxFit.cover,
+                      Text(
+                        'RS. ${widget.price}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFFF6B35),
                         ),
                       ),
-                      Positioned(
-                        top: 15,
-                        right: 15,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFE8B86D), Color(0xFFD4A860)],
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            widget.price,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.white, width: 2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.arrow_forward_rounded,
+                          color: Colors.white,
+                          size: 20,
                         ),
                       ),
                     ],
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.title,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2C1810),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          widget.description,
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: Colors.grey[600],
-                            height: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () {},
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFE8B86D),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'Order Now',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                Icon(Icons.arrow_forward_rounded, size: 20),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ---------------------- REVIEWS SECTION ----------------------
-class ReviewsSection extends StatelessWidget {
-  const ReviewsSection({super.key});
+// ==================== UNIQUE REVIEWS SECTION ====================
+class ReviewsSectionUnique extends StatelessWidget {
+  const ReviewsSectionUnique({super.key});
 
-  final List<Map<String, String>> reviews = const [
-    {
-      "name": "Ahmed Khan",
-      "review":
-          "Amazing food and cozy ambiance! The BBQ platter is outstanding.",
-      "image": "https://i.pravatar.cc/150?img=12",
-    },
-    {
-      "name": "Sara Ali",
-      "review":
-          "Best biryani in town! Authentic taste that reminds me of home.",
-      "image": "https://i.pravatar.cc/150?img=47",
-    },
-    {
-      "name": "Bilal Sheikh",
-      "review": "Friendly staff and delicious food. Highly recommended!",
-      "image": "https://i.pravatar.cc/150?img=33",
-    },
-    {
-      "name": "Fatima Hassan",
-      "review": "The karahi chicken is to die for. Perfect spice level!",
-      "image": "https://i.pravatar.cc/150?img=45",
-    },
-    {
-      "name": "Usman Tariq",
-      "review": "Great coffee and amazing breakfast options. Love this place!",
-      "image": "https://i.pravatar.cc/150?img=52",
-    },
-    {
-      "name": "Ayesha Malik",
-      "review":
-          "The nihari here is absolutely authentic! Takes me back to my grandmother's kitchen.",
-      "image": "https://i.pravatar.cc/150?img=38",
-    },
-    {
-      "name": "Hassan Raza",
-      "review":
-          "Best seekh kababs in Sahiwal! The chapli kabab is also mind-blowing.",
-      "image": "https://i.pravatar.cc/150?img=14",
-    },
-    {
-      "name": "Zainab Siddiqui",
-      "review":
-          "Their desi chai and haleem combo is perfection. Family-friendly atmosphere!",
-      "image": "https://i.pravatar.cc/150?img=44",
-    },
-  ];
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 850;
-
     return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 20 : 100,
-        vertical: isMobile ? 60 : 120,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 120),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFFFFFBF5),
-            const Color(0xFFE8B86D).withOpacity(0.05),
+            const Color(0xFFFFF8E7),
+            const Color(0xFFFF6B35).withOpacity(0.05),
           ],
         ),
       ),
       child: Column(
         children: [
-          const _SectionHeader(
-            title: 'Customer Reviews',
-            subtitle: 'What our valued customers say about us',
-          ),
-          const SizedBox(height: 60),
-          SizedBox(
-            height: 320,
-            child: PageView.builder(
-              controller: PageController(
-                viewportFraction: isMobile ? 0.9 : 0.4,
+          // Header
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              Text(
+                'REVIEWS',
+                style: TextStyle(
+                  fontSize: 120,
+                  fontWeight: FontWeight.w900,
+                  foreground: Paint()
+                    ..style = PaintingStyle.stroke
+                    ..strokeWidth = 2
+                    ..color = const Color(0xFFFF6B35).withOpacity(0.1),
+                ),
               ),
-              itemCount: reviews.length,
+              const Text(
+                'WHAT PEOPLE SAY',
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF2D1B00),
+                  letterSpacing: 2,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 80),
+
+          // Reviews grid
+          SizedBox(
+            height: 400,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: 5,
               itemBuilder: (context, index) {
-                final review = reviews[index];
-                return _ReviewCard(
-                  image: review["image"]!,
-                  name: review["name"]!,
-                  review: review["review"]!,
-                  rating: 4,
-                  index: index,
-                );
+                return _UniqueReviewCard(index: index);
               },
             ),
           ),
@@ -1275,386 +1236,414 @@ class ReviewsSection extends StatelessWidget {
   }
 }
 
-class _ReviewCard extends StatefulWidget {
-  final String image;
-  final String name;
-  final String review;
-  final int rating;
+class _UniqueReviewCard extends StatelessWidget {
   final int index;
 
-  const _ReviewCard({
-    required this.image,
-    required this.name,
-    required this.review,
-    required this.rating,
-    required this.index,
-  });
-
-  @override
-  State<_ReviewCard> createState() => _ReviewCardState();
-}
-
-class _ReviewCardState extends State<_ReviewCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _animation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-
-    Future.delayed(Duration(milliseconds: widget.index * 200), () {
-      if (mounted) _controller.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  const _UniqueReviewCard({required this.index});
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _animation,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.3),
-          end: Offset.zero,
-        ).animate(_animation),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(25),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, Color(0xFFFFFBF5)],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFE8B86D).withOpacity(0.2),
-                  blurRadius: 20,
-                  spreadRadius: 3,
+    return Container(
+      width: 350,
+      margin: const EdgeInsets.only(right: 30),
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(
+          color: const Color(0xFFFF6B35).withOpacity(0.2),
+          width: 2,
+        ),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF6B35).withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
+                  ),
+                  shape: BoxShape.circle,
                 ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(30),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFFE8B86D),
-                        width: 3,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFE8B86D).withOpacity(0.3),
-                          blurRadius: 15,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: CircleAvatar(
-                      radius: 45,
-                      backgroundImage: NetworkImage(widget.image),
-                    ),
+                child: const Center(
+                  child: Icon(
+                    Icons.person_rounded,
+                    color: Colors.white,
+                    size: 30,
                   ),
-                  const SizedBox(height: 20),
+                ),
+              ),
+              const SizedBox(width: 15),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
                   Text(
-                    widget.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22,
-                      color: Color(0xFF2C1810),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      widget.rating,
-                      (index) => const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 2),
-                        child: Icon(
-                          Icons.star_rounded,
-                          color: Color(0xFFE8B86D),
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '"${widget.review}"',
-                    textAlign: TextAlign.center,
+                    'Ahmed Khan',
                     style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[700],
-                      height: 1.6,
-                      fontStyle: FontStyle.italic,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF2D1B00),
+                    ),
+                  ),
+                  Text(
+                    'Food Enthusiast',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF9B8B7E),
+                      letterSpacing: 1,
                     ),
                   ),
                 ],
               ),
+            ],
+          ),
+          const SizedBox(height: 25),
+          Row(
+            children: List.generate(
+              5,
+              (i) => const Padding(
+                padding: EdgeInsets.only(right: 4),
+                child: Icon(
+                  Icons.star_rounded,
+                  color: Color(0xFFFF6B35),
+                  size: 20,
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------- CONTACT SECTION ----------------------
-class ContactSection extends StatelessWidget {
-  const ContactSection({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 850;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 20 : 100,
-        vertical: isMobile ? 60 : 120,
-      ),
-      color: Colors.white,
-      child: Column(
-        children: [
-          const _SectionHeader(
-            title: 'Get In Touch',
-            subtitle: 'We\'d love to hear from you',
+          const SizedBox(height: 20),
+          const Text(
+            '"The best biryani I\'ve ever tasted! Authentic flavors that remind me of home. The karahi is absolutely mind-blowing!"',
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.8,
+              color: Color(0xFF6B5B4E),
+              fontStyle: FontStyle.italic,
+            ),
           ),
-          const SizedBox(height: 60),
-          isMobile
-              ? Column(children: [_ContactInfo()])
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [_ContactInfo()],
-                ),
+          const Spacer(),
+          Container(
+            height: 3,
+            width: 60,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _ContactInfo extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Wrap(
-          spacing: 20,
-          runSpacing: 20,
-          children: const [
-            SizedBox(
-              width: 250,
-              child: _InfoCard(
-                icon: Icons.location_on_rounded,
-                title: 'Visit Us',
-                info: '123 Main Street\nSahiwal, Punjab\nPakistan',
-                gradient: [Color(0xFFE8B86D), Color(0xFFD4A860)],
-              ),
-            ),
-            SizedBox(
-              width: 250,
-              child: _InfoCard(
-                icon: Icons.phone_rounded,
-                title: 'Call Us',
-                info: '+92 300 1234567\n+92 300 7654321',
-                gradient: [Color(0xFF8B4513), Color(0xFF654321)],
-              ),
-            ),
-            SizedBox(
-              width: 250,
-              child: _InfoCard(
-                icon: Icons.email_rounded,
-                title: 'Email Us',
-                info: 'info@bulbulcafe.com\nsupport@bulbulcafe.com',
-                gradient: [Color(0xFFE8B86D), Color(0xFFD4A860)],
-              ),
-            ),
-            SizedBox(
-              width: 250,
-              child: _InfoCard(
-                icon: Icons.access_time_rounded,
-                title: 'Working Hours',
-                info: 'Monday - Sunday\n8:00 AM - 11:00 PM',
-                gradient: [Color(0xFF8B4513), Color(0xFF654321)],
-              ),
-            ),
-          ],
-        ),
-      ],
+// ==================== UNIQUE CONTACT SECTION ====================
+class ContactSectionUnique extends StatelessWidget {
+  ContactSectionUnique({super.key}) {
+    // Register the map iframe
+    ui.platformViewRegistry.registerViewFactory(
+      'map-iframe',
+      (int viewId) => IFrameElement()
+        ..src =
+            "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3432.3176797293563!2d73.1192334!3d30.653181699999994!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3922b7c123226b53%3A0x16d26960d9b4fb77!2sBulbul%20Hotel%20pakpattan%20chowk!5e0!3m2!1sen!2s!4v1763971643322!5m2!1sen!2s"
+        ..style.border = 'none'
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..allowFullscreen = true,
     );
   }
-}
-
-class _InfoCard extends StatefulWidget {
-  final IconData icon;
-  final String title;
-  final String info;
-  final List<Color> gradient;
-
-  const _InfoCard({
-    required this.icon,
-    required this.title,
-    required this.info,
-    required this.gradient,
-  });
-
-  @override
-  State<_InfoCard> createState() => _InfoCardState();
-}
-
-class _InfoCardState extends State<_InfoCard> {
-  bool _isHovered = false;
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        transform: Matrix4.identity()..translate(0.0, _isHovered ? -5.0 : 0.0),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: _isHovered
-                  ? const Color(0xFFE8B86D).withOpacity(0.3)
-                  : Colors.grey.withOpacity(0.1),
-              blurRadius: _isHovered ? 20 : 10,
-              spreadRadius: _isHovered ? 3 : 1,
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: widget.gradient),
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.gradient[0].withOpacity(0.3),
-                      blurRadius: 10,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: Icon(widget.icon, color: Colors.white, size: 28),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2C1810),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.info,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------- FOOTER SECTION ----------------------
-class FooterSection extends StatelessWidget {
-  const FooterSection({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 850;
+    final size = MediaQuery.of(context).size;
+    final isDesktop = size.width > 900;
 
     return Container(
-      width: double.infinity,
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 20 : 100,
-        vertical: isMobile ? 50 : 80,
+        horizontal: isDesktop ? 60 : 30,
+        vertical: 80,
       ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF2C1810), Color(0xFF1A0F0A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2D1B00), Color(0xFF1A0F00)],
         ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          isMobile
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _FooterBrand(),
-                    const SizedBox(height: 40),
-                    _FooterLinks(),
-                    const SizedBox(height: 30),
-                    _FooterContact(),
-                    const SizedBox(height: 30),
-                    _SocialLinks(),
-                  ],
-                )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 2, child: _FooterBrand()),
-                    Expanded(child: _FooterLinks()),
-                    Expanded(child: _FooterContact()),
-                    Expanded(child: _SocialLinks()),
-                  ],
+          if (isDesktop)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 3, child: _buildLeftContent()),
+                const SizedBox(width: 60),
+                Expanded(flex: 2, child: _buildRightContent(isDesktop)),
+              ],
+            )
+          else
+            Column(
+              children: [
+                _buildLeftContent(),
+                const SizedBox(height: 40),
+                _buildRightContent(isDesktop),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeftContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'GET IN',
+          style: TextStyle(
+            fontSize: 60,
+            fontWeight: FontWeight.w300,
+            color: Colors.white,
+            height: 1,
+          ),
+        ),
+        Stack(
+          children: [
+            Text(
+              'TOUCH',
+              style: TextStyle(
+                fontSize: 60,
+                fontWeight: FontWeight.w900,
+                foreground: Paint()
+                  ..style = PaintingStyle.stroke
+                  ..strokeWidth = 2
+                  ..color = const Color(0xFFFF6B35),
+                height: 1,
+              ),
+            ),
+            const Text(
+              'TOUCH',
+              style: TextStyle(
+                fontSize: 60,
+                fontWeight: FontWeight.w900,
+                color: Colors.transparent,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 40),
+        const Text(
+          'Visit us, call us, or drop by for the best Pakistani food experience in Sahiwal.',
+          style: TextStyle(fontSize: 18, color: Colors.white70, height: 1.8),
+        ),
+        const SizedBox(height: 50),
+        _buildContactRow(
+          Icons.location_on_rounded,
+          'Main Street, Sahiwal, Pakistan',
+        ),
+        const SizedBox(height: 20),
+        _buildContactRow(Icons.phone_rounded, '+92 300 1234567'),
+        const SizedBox(height: 20),
+        _buildContactRow(Icons.email_rounded, 'info@bulbulcafe.com'),
+      ],
+    );
+  }
+
+  Widget _buildRightContent(bool isDesktop) {
+    return Column(
+      children: [
+        // Hours card
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(30),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFFF6B35), width: 3),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
+                  ),
+                  shape: BoxShape.circle,
                 ),
-          const SizedBox(height: 50),
-          Container(height: 1, color: Colors.white.withOpacity(0.1)),
+                child: const Icon(
+                  Icons.access_time_rounded,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'OPEN HOURS',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 15),
+              const Text(
+                'Monday - Sunday',
+                style: TextStyle(fontSize: 16, color: Colors.white70),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '8:00 AM - 11:00 PM',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFFFF6B35),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // Fixed map container
+        Container(
+          width: double.infinity,
+          height: isDesktop ? 350 : 300,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFFF6B35), width: 3),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: const HtmlElementView(viewType: 'map-iframe'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContactRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFFF6B35), width: 2),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: const Color(0xFFFF6B35), size: 24),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 16, color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==================== UNIQUE FOOTER SECTION ====================
+class FooterSectionUnique extends StatelessWidget {
+  const FooterSectionUnique({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(60),
+      color: const Color(0xFF1A0F00),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Brand
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 70,
+                    width: 170,
+                    padding: const EdgeInsets.symmetric(horizontal: 5,vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      gradient: LinearGradient(
+                        colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
+                      ),
+                      shape: BoxShape.rectangle,
+                      image: DecorationImage(image: AssetImage(ImagePath.logo_img),fit: BoxFit.cover)
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Authentic Pakistani Cuisine',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 14,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ],
+              ),
+
+              // Social icons
+              Row(
+                children: [
+                  _buildSocialIcon(Icons.facebook),
+                  const SizedBox(width: 15),
+                  _buildSocialIcon(Icons.camera_alt),
+                  const SizedBox(width: 15),
+                  _buildSocialIcon(Icons.phone_android),
+                ],
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 60),
+
+          Container(
+            height: 2,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.0),
+                  const Color(0xFFFF6B35).withOpacity(0.3),
+                  Colors.white.withOpacity(0.0),
+                ],
+              ),
+            ),
+          ),
+
           const SizedBox(height: 30),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.favorite, color: Color(0xFFE8B86D), size: 20),
-              const SizedBox(width: 8),
+              const Icon(Icons.favorite, color: Color(0xFFFF6B35), size: 16),
+              const SizedBox(width: 10),
               Text(
-                '© ${DateTime.now().year} Bulbul Cafe. Crafted with love in Pakistan',
-                style: const TextStyle(color: Colors.white54, fontSize: 14),
-                textAlign: TextAlign.center,
+                '© ${DateTime.now().year} BULBUL CAFE. CRAFTED WITH PASSION',
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 12,
+                  letterSpacing: 2,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -1662,191 +1651,18 @@ class FooterSection extends StatelessWidget {
       ),
     );
   }
-}
 
-class _FooterBrand extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Text(
-              'Bulbul Cafe',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ],
+  Widget _buildSocialIcon(IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: const Color(0xFFFF6B35).withOpacity(0.3),
+          width: 2,
         ),
-        const SizedBox(height: 20),
-        const Text(
-          'Serving authentic Pakistani cuisine\nwith passion since 1985.\nExperience the true taste of tradition.',
-          style: TextStyle(color: Colors.white70, fontSize: 15, height: 1.8),
-        ),
-      ],
-    );
-  }
-}
-
-class _FooterLinks extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Quick Links',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 20),
-        ...['Home', 'About Us', 'Menu', 'Reviews', 'Contact'].map(
-          (link) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: InkWell(
-              onTap: () {},
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: Color(0xFFE8B86D),
-                    size: 14,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    link,
-                    style: const TextStyle(color: Colors.white70, fontSize: 15),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FooterContact extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
-        Text(
-          'Contact Info',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        SizedBox(height: 20),
-        Text(
-          '📍 123 Main Street\n   Sahiwal, Pakistan',
-          style: TextStyle(color: Colors.white70, fontSize: 15, height: 1.8),
-        ),
-        SizedBox(height: 12),
-        Text(
-          '📞 +92 300 1234567',
-          style: TextStyle(color: Colors.white70, fontSize: 15),
-        ),
-        SizedBox(height: 12),
-        Text(
-          '✉️ info@bulbulcafe.com',
-          style: TextStyle(color: Colors.white70, fontSize: 15),
-        ),
-      ],
-    );
-  }
-}
-
-class _SocialLinks extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Follow Us',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            _SocialButton(icon: Icons.facebook, color: const Color(0xFF1877F2)),
-            const SizedBox(width: 12),
-            _SocialButton(
-              icon: Icons.camera_alt,
-              color: const Color(0xFFE4405F),
-            ),
-            const SizedBox(width: 12),
-            _SocialButton(
-              icon: Icons.phone_android,
-              color: const Color(0xFF25D366),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _SocialButton extends StatefulWidget {
-  final IconData icon;
-  final Color color;
-
-  const _SocialButton({required this.icon, required this.color});
-
-  @override
-  State<_SocialButton> createState() => _SocialButtonState();
-}
-
-class _SocialButtonState extends State<_SocialButton> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: _isHovered
-              ? widget.color
-              : const Color(0xFFE8B86D).withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: _isHovered
-              ? [
-                  BoxShadow(
-                    color: widget.color.withOpacity(0.4),
-                    blurRadius: 15,
-                    spreadRadius: 2,
-                  ),
-                ]
-              : [],
-        ),
-        child: Icon(
-          widget.icon,
-          color: _isHovered ? Colors.white : const Color(0xFFE8B86D),
-          size: 24,
-        ),
+        shape: BoxShape.circle,
       ),
+      child: Icon(icon, color: const Color(0xFFFF6B35), size: 20),
     );
   }
 }
