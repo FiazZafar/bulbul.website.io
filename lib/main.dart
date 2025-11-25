@@ -34,27 +34,29 @@ class MyApp extends StatelessWidget {
 
 // ==================== RESPONSIVE HELPER CLASS ====================
 class ResponsiveHelper {
-  static bool isMobile(BuildContext context) => 
-    MediaQuery.of(context).size.width < 600;
-  
-  static bool isTablet(BuildContext context) => 
-    MediaQuery.of(context).size.width >= 600 && 
-    MediaQuery.of(context).size.width < 900;
-  
-  static bool isDesktop(BuildContext context) => 
-    MediaQuery.of(context).size.width >= 900;
-  
+  static bool isMobile(BuildContext context) =>
+      MediaQuery.of(context).size.width < 600;
+
+  static bool isTablet(BuildContext context) =>
+      MediaQuery.of(context).size.width >= 600 &&
+      MediaQuery.of(context).size.width < 900;
+
+  static bool isDesktop(BuildContext context) =>
+      MediaQuery.of(context).size.width >= 900;
+
   static double getResponsiveFontSize(BuildContext context, double size) {
     final width = MediaQuery.of(context).size.width;
     if (width < 600) return size * 0.5;
     if (width < 900) return size * 0.7;
     return size;
   }
-  
+
   static EdgeInsets getResponsivePadding(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    if (width < 600) return const EdgeInsets.symmetric(horizontal: 20, vertical: 40);
-    if (width < 900) return const EdgeInsets.symmetric(horizontal: 40, vertical: 60);
+    if (width < 600)
+      return const EdgeInsets.symmetric(horizontal: 20, vertical: 40);
+    if (width < 900)
+      return const EdgeInsets.symmetric(horizontal: 40, vertical: 60);
     return const EdgeInsets.symmetric(horizontal: 60, vertical: 80);
   }
 }
@@ -70,7 +72,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   final List<GlobalKey> _sectionKeys = List.generate(5, (_) => GlobalKey());
-  
+
   late AnimationController _floatingController;
   int _currentSection = 0;
   bool _isScrolling = false;
@@ -82,13 +84,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       duration: const Duration(seconds: 3),
       vsync: this,
     )..repeat(reverse: true);
-    
+
     _scrollController.addListener(_updateCurrentSection);
   }
 
   void _updateCurrentSection() {
     if (_isScrolling) return;
-    
+
     for (int i = 0; i < _sectionKeys.length; i++) {
       final context = _sectionKeys[i].currentContext;
       if (context != null) {
@@ -144,7 +146,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveHelper.isMobile(context);
-    
+
     return Scaffold(
       body: Stack(
         children: [
@@ -161,11 +163,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   onItemTap: _navigateToSection,
                   currentSection: _currentSection,
                 ),
-                Container(key: _sectionKeys[0], child: const HeroSectionResponsive()),
-                Container(key: _sectionKeys[1], child: const AboutSectionResponsive()),
-                Container(key: _sectionKeys[2], child: const MenuSectionResponsive()),
-                Container(key: _sectionKeys[3], child: const ReviewsSectionResponsive()),
-                Container(key: _sectionKeys[4], child: ContactSectionResponsive()),
+                Container(
+                  key: _sectionKeys[0],
+                  child: const HeroSectionResponsive(),
+                ),
+                Container(
+                  key: _sectionKeys[1],
+                  child: const AboutSectionResponsive(),
+                ),
+                Container(
+                  key: _sectionKeys[2],
+                  child: const MenuSectionResponsive(),
+                ),
+                Container(
+                  key: _sectionKeys[3],
+                  child: const ReviewsSectionResponsive(),
+                ),
+                Container(
+                  key: _sectionKeys[4],
+                  child: ContactSectionResponsive(),
+                ),
                 const FooterSectionResponsive(),
               ],
             ),
@@ -179,7 +196,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return AnimatedBuilder(
       animation: _floatingController,
       builder: (context, child) {
-        final offset = math.sin(_floatingController.value * 2 * math.pi + index) * 30;
+        final offset =
+            math.sin(_floatingController.value * 2 * math.pi + index) * 30;
         return Positioned(
           left: (index * 200.0) % MediaQuery.of(context).size.width,
           top: 100 + offset,
@@ -265,15 +283,9 @@ class _UniqueNavBarState extends State<UniqueNavBar> {
                     colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
                   ),
                   borderRadius: BorderRadius.circular(25),
-                ),
-                child: Center(
-                  child: Text(
-                    'BULBUL',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: isMobile ? 14 : 16,
-                    ),
+                  image: DecorationImage(
+                    image: AssetImage(ImagePath.logo_img),
+                    fit: BoxFit.cover,
                   ),
                 ),
               ),
@@ -293,36 +305,49 @@ class _UniqueNavBarState extends State<UniqueNavBar> {
 
           if (isMobile)
             PopupMenuButton<String>(
-              icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 28),
+              icon: const Icon(
+                Icons.menu_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
               onSelected: widget.onItemTap,
               color: const Color(0xFF2D1B00),
-              itemBuilder: (BuildContext context) => [
-                'HOME',
-                'STORY',
-                'MENU',
-                'REVIEWS',
-                'CONNECT',
-              ].map((String item) {
-                final index = ['HOME', 'STORY', 'MENU', 'REVIEWS', 'CONNECT'].indexOf(item);
-                final isActive = widget.currentSection == index;
-                return PopupMenuItem<String>(
-                  value: item,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isActive ? const Color(0xFFFF6B35).withOpacity(0.2) : null,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      item,
-                      style: TextStyle(
-                        color: isActive ? const Color(0xFFFF6B35) : Colors.white,
-                        fontWeight: isActive ? FontWeight.w900 : FontWeight.w600,
+              itemBuilder: (BuildContext context) =>
+                  ['HOME', 'STORY', 'MENU', 'REVIEWS', 'CONNECT'].map((
+                    String item,
+                  ) {
+                    final index = [
+                      'HOME',
+                      'STORY',
+                      'MENU',
+                      'REVIEWS',
+                      'CONNECT',
+                    ].indexOf(item);
+                    final isActive = widget.currentSection == index;
+                    return PopupMenuItem<String>(
+                      value: item,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? const Color(0xFFFF6B35).withOpacity(0.2)
+                              : null,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          item,
+                          style: TextStyle(
+                            color: isActive
+                                ? const Color(0xFFFF6B35)
+                                : Colors.white,
+                            fontWeight: isActive
+                                ? FontWeight.w900
+                                : FontWeight.w600,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              }).toList(),
+                    );
+                  }).toList(),
             ),
         ],
       ),
@@ -346,8 +371,8 @@ class _UniqueNavBarState extends State<UniqueNavBar> {
             backgroundColor: isActive
                 ? const Color(0xFFFF6B35)
                 : isHovered
-                    ? const Color(0xFFFF6B35).withOpacity(0.5)
-                    : Colors.transparent,
+                ? const Color(0xFFFF6B35).withOpacity(0.5)
+                : Colors.transparent,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
@@ -467,7 +492,7 @@ class _HeroSectionResponsiveState extends State<HeroSectionResponsive>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(height: isMobile ? 80 : 100),
-                    
+
                     // Badge
                     Container(
                       padding: EdgeInsets.symmetric(
@@ -491,11 +516,14 @@ class _HeroSectionResponsiveState extends State<HeroSectionResponsive>
                         ),
                       ),
                     ),
-                    
+
                     SizedBox(height: isMobile ? 20 : 30),
 
                     // Main title
-                    if (isMobile) _buildMobileTitle() else _buildDesktopTitle(isTablet),
+                    if (isMobile)
+                      _buildMobileTitle()
+                    else
+                      _buildDesktopTitle(isTablet),
 
                     SizedBox(height: isMobile ? 20 : 30),
 
@@ -917,7 +945,7 @@ class AboutSectionResponsive extends StatelessWidget {
         SizedBox(height: isMobile ? 30 : 40),
         isMobile
             ? Column(
-              mainAxisSize: MainAxisSize.min,
+                mainAxisSize: MainAxisSize.min,
                 children: const [
                   _ResponsiveStatCard(
                     number: '38+',
@@ -969,9 +997,7 @@ class AboutSectionResponsive extends StatelessWidget {
 
     return Center(
       child: Container(
-        constraints: BoxConstraints(
-          maxWidth: isMobile ? double.infinity : 500,
-        ),
+        constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 500),
         child: Column(
           children: [
             Row(
@@ -1119,10 +1145,7 @@ class MenuSectionResponsive extends StatelessWidget {
                 )
               : Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildMenuHeader(context),
-                    _buildViewAllButton(),
-                  ],
+                  children: [_buildMenuHeader(context), _buildViewAllButton()],
                 ),
 
           SizedBox(height: isMobile ? 40 : (isTablet ? 60 : 80)),
@@ -1195,7 +1218,9 @@ class MenuSectionResponsive extends StatelessWidget {
     final isTablet = ResponsiveHelper.isTablet(context);
 
     return Column(
-      crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: isMobile
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         Text(
           'SIGNATURE',
@@ -1721,10 +1746,7 @@ class ContactSectionResponsive extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: TextStyle(
-              fontSize: isMobile ? 14 : 16,
-              color: Colors.white,
-            ),
+            style: TextStyle(fontSize: isMobile ? 14 : 16, color: Colors.white),
           ),
         ),
       ],
@@ -1834,10 +1856,7 @@ class FooterSectionResponsive extends StatelessWidget {
                 )
               : Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildBrandSection(isMobile),
-                    _buildSocialIcons(),
-                  ],
+                  children: [_buildBrandSection(isMobile), _buildSocialIcons()],
                 ),
           SizedBox(height: isMobile ? 40 : 60),
           Container(
@@ -1879,7 +1898,9 @@ class FooterSectionResponsive extends StatelessWidget {
 
   Widget _buildBrandSection(bool isMobile) {
     return Column(
-      crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: isMobile
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         Container(
           height: isMobile ? 60 : 70,
@@ -1890,16 +1911,9 @@ class FooterSectionResponsive extends StatelessWidget {
             gradient: const LinearGradient(
               colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
             ),
-          ),
-          child: Center(
-            child: Text(
-              'BULBUL',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: isMobile ? 20 : 24,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-              ),
+            image: DecorationImage(
+              image: AssetImage(ImagePath.logo_img),
+              fit: BoxFit.cover,
             ),
           ),
         ),
