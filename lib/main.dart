@@ -426,7 +426,7 @@ class _HeroSectionResponsiveState extends State<HeroSectionResponsive>
     final isTablet = ResponsiveHelper.isTablet(context);
 
     return SizedBox(
-      height: size.height,
+      height: isMobile ? size.height * 0.7 : size.height ,
       width: double.infinity,
       child: Stack(
         children: [
@@ -946,17 +946,22 @@ class AboutSectionResponsive extends StatelessWidget {
         isMobile
             ? Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
-                  _ResponsiveStatCard(
-                    number: '38+',
-                    label: 'YEARS',
-                    color: Color(0xFFFF6B35),
-                  ),
-                  SizedBox(height: 15),
-                  _ResponsiveStatCard(
-                    number: '50K+',
-                    label: 'SERVED',
-                    color: Color(0xFFF7931E),
+                  Row(
+                    children: [
+                      _ResponsiveStatCard(
+                        number: '38+',
+                        label: 'YEARS',
+                        color: Color(0xFFFF6B35),
+                      ),
+                      SizedBox(width: 15),
+                      _ResponsiveStatCard(
+                        number: '50K+',
+                        label: 'SERVED',
+                        color: Color(0xFFF7931E),
+                      ),
+                    ],
                   ),
                   SizedBox(height: 15),
                   _ResponsiveStatCard(
@@ -1480,7 +1485,7 @@ class ReviewsSectionResponsive extends StatelessWidget {
 
           // Reviews list
           SizedBox(
-            height: isMobile ? 450 : 400,
+            height: isMobile ? 330 : 400,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: 5,
