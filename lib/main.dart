@@ -426,7 +426,7 @@ class _HeroSectionResponsiveState extends State<HeroSectionResponsive>
     final isTablet = ResponsiveHelper.isTablet(context);
 
     return SizedBox(
-      height: isMobile ? size.height * 0.7 : size.height ,
+      height: isMobile ? size.height : size.height ,
       width: double.infinity,
       child: Stack(
         children: [
